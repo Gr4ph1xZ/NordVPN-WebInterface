@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>VPN Steuerung</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to right, #007BFF, #00C6FF);
+            color: white;
+        }
+
+        .container {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2em;
+            font-weight: 300;
+        }
+
+        .status-box {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            font-size: 18px;
+        }
+
+        .connected {
+            background-color: #28a745;
+        }
+
+        .disconnected {
+            background-color: #dc3545;
+        }
+
+        button, select {
+            padding: 15px 25px;
+            font-size: 18px;
+            margin: 10px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            color: white;
+            background-color: #28a745;
+            transition: background-color 0.3s ease;
+            width: 100%;
+            max-width: 300px;
+        }
+
+        select {
+            background-color: #007BFF;
+        }
+
+        button.disconnect {
+            background-color: #dc3545;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        button.disconnect:hover {
+            background-color: #c82333;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            margin-left: -125px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            text-align: center;
+            border-radius: 5px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1;
+            left: 50%;
+            bottom: 30px;
+            font-size: 17px;
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        #toast.show {
+            visibility: visible;
+            -webkit-animation: fadein 0.5s, fadeout 0.5s 4.5s;
+            animation: fadein 0.5s, fadeout 0.5s 4.5s;
+        }
+
+        @-webkit-keyframes fadein {
+            from {
+                bottom: 0;
+                opacity: 0;
+            }
+            to {
+                bottom: 30px;
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadein {
+            from {
+                bottom: 0;
+                opacity: 0;
+            }
+            to {
+                bottom: 30px;
+                opacity: 1;
+            }
+        }
+
+        @-webkit-keyframes fadeout {
+            from {
+                bottom: 30px;
+                opacity: 1;
+            }
+            to {
+                bottom: 0;
+                opacity: 0;
+            }
+        }
+
+        @keyframes fadeout {
+            from {
+                bottom: 30px;
+                opacity: 1;
+            }
+            to {
+                bottom: 0;
+                opacity: 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.5em;
+            }
+            button, select {
+                font-size: 16px;
+                padding: 12px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div id="toast">VPN Status</div>
+<div class="container">
+    <h1>VPN Steuerung</h1>
+    <div class="status-box disconnected" id="statusBox">Status: Disconnected</div>
+    <div class="status-box" id="connectedServer"></div>
+    <form onsubmit="handleSubmit(event, '/connect');">
+        <select id="serverSelect" name="server">
+            <!-- Server will get added here dynamically -->
+        </select>
+        <button type="submit">VPN Verbinden</button>
+    </form>
+    <form onsubmit="handleSubmit(event, '/disconnect');">
+        <button class="disconnect" type="submit">VPN Trennen</button>
+    </form>
+</div>
+
+<script>
+    function handleSubmit(event, url) {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        fetch(url, {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => {
+                return response.text().then(text => {
+                    if (response.ok) {
+                        showToast(text);
+                        updateStatus();  // Refresh status after connection oder disconnect
+                    } else {
+                        showToast('Fehler: ' + text, true);  // Show toast with error status
+                    }
+                });
+            })
+            .catch(error => {
+                showToast('Fehler: ' + error.message, true);
+            });
+    }
+
+    function showToast(message, isError = false) {
+        const toast = document.getElementById("toast");
+        toast.innerText = message;
+        toast.style.backgroundColor = isError ? 'rgba(255, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.8)';
+        toast.className = "show";
+        setTimeout(() => {
+            toast.className = toast.className.replace("show", "");
+        }, 5000);
+    }
+
+    function updateStatus() {
+        fetch('/status')
+            .then(response => response.json())
+            .then(data => {
+                const statusBox = document.getElementById("statusBox");
+                const connectedServer = document.getElementById("connectedServer");
+
+                if (data.status === "Connected") {
+                    statusBox.className = "status-box connected";
+                    connectedServer.innerText = `Verbunden mit: ${data.server}`;
+                } else {
+                    statusBox.className = "status-box disconnected";
+                    connectedServer.innerText = "";
+                }
+                statusBox.innerText = `Status: ${data.status}`;
+            });
+    }
+
+    function loadServers() {
+        fetch('/servers')
+            .then(response => response.json())
+            .then(servers => {
+                const serverSelect = document.getElementById("serverSelect");
+                serverSelect.innerHTML = ""; // Clear the select box
+                servers.forEach(server => {
+                    const option = document.createElement("option");
+                    option.value = server.code.toLowerCase(); // Server code as value in lowercase letter
+                    option.text = server.name.split('#')[0].trim(); // Remove numbers after country code
+                    serverSelect.add(option);
+                });
+
+                // Set the selected server in the dropdown list, if connected
+                fetch('/status')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.server) {
+                            // Remove numbers and set lower case letters
+                            document.getElementById("serverSelect").value = data.server.replace(/\d+/g, '').toLowerCase();
+                        }
+                    });
+            });
+    }
+
+    // Refresh status and server after load
+    document.addEventListener("DOMContentLoaded", () => {
+        updateStatus();
+        loadServers();
+        // Refresh status all 10 seconds
+        setInterval(updateStatus, 10000);
+    });
+</script>
+</body>
+</html>
